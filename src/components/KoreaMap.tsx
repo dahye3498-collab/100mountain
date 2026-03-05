@@ -5,9 +5,9 @@ import dynamic from 'next/dynamic'
 import { AnimatePresence, motion } from 'framer-motion'
 import { createClient } from '@/utils/supabase/client'
 import { Check, X, Loader2, LogOut } from 'lucide-react'
-import { MountainData } from '@/data/mountains'
+import { MOUNTAINS, MountainData } from '@/data/mountains'
 
-const MapView = dynamic(() => import('./MapView'), { ssr: false })
+const IllustratedMap = dynamic(() => import('./IllustratedMap'), { ssr: false })
 
 const supabase = createClient()
 
@@ -134,7 +134,8 @@ export function KoreaMap({ initialRecords, userId }: Props) {
 
       {/* ── Map ── */}
       <div className="w-full h-full">
-        <MapView
+        <IllustratedMap
+          mountains={MOUNTAINS}
           climbedSet={climbedSet}
           selected={selected}
           onSelect={handleSelect}
@@ -144,11 +145,19 @@ export function KoreaMap({ initialRecords, userId }: Props) {
       {/* ── Legend (floating bottom-right) ── */}
       <div className="absolute bottom-6 right-4 z-[999] bg-white/90 backdrop-blur-sm rounded-2xl px-3 py-2.5 shadow-md border border-gray-100 text-[11px] space-y-1.5 pointer-events-none">
         <div className="flex items-center gap-2">
-          <span className="w-4 h-4 rounded-full bg-orange-400 border-2 border-orange-600 inline-block flex-shrink-0" />
-          <span className="text-gray-500">미등반</span>
+          <svg width="12" height="11" viewBox="0 0 12 11"><polygon points="6,0 0,11 12,11" fill="#ef4444" /></svg>
+          <span className="text-gray-500">어려움</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="w-4 h-4 rounded-full bg-emerald-500 border-2 border-emerald-700 inline-block flex-shrink-0" />
+          <svg width="12" height="11" viewBox="0 0 12 11"><polygon points="6,0 0,11 12,11" fill="#f97316" /></svg>
+          <span className="text-gray-500">보통</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg width="12" height="11" viewBox="0 0 12 11"><polygon points="6,0 0,11 12,11" fill="#eab308" /></svg>
+          <span className="text-gray-500">쉬움</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <svg width="12" height="11" viewBox="0 0 12 11"><polygon points="6,0 0,11 12,11" fill="#22c55e" /></svg>
           <span className="text-gray-500">등반 완료</span>
         </div>
       </div>
