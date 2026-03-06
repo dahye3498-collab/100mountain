@@ -3,20 +3,20 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { MountainData } from '@/data/mountains'
 
-// Korea bounding box (approximate for the illustrated map image)
+// Korea coordinate bounds (South Korea mainland + Jeju)
 const MAP_BOUNDS = {
-  latMin: 33.0,   // Jeju south
-  latMax: 38.8,   // north
-  lngMin: 125.0,  // west coast
-  lngMax: 130.5,  // east coast
+  latMin: 33.0,
+  latMax: 38.8,
+  lngMin: 125.0,
+  lngMax: 129.6,
 }
 
-// Image-specific offsets (tune these to align markers with the map image)
+// Where Korea sits within the image (percentage-based)
 const IMAGE_OFFSET = {
-  xPct: 13,   // left padding % where Korea starts in the image
-  yPct: 5,    // top padding % where Korea starts in the image
-  wPct: 70,   // width % that Korea occupies in the image
-  hPct: 85,   // height % that Korea occupies in the image
+  xPct: 18,
+  yPct: 6,
+  wPct: 52,
+  hPct: 78,
 }
 
 function latLngToPercent(lat: number, lng: number): { x: number; y: number } {
@@ -28,11 +28,11 @@ function latLngToPercent(lat: number, lng: number): { x: number; y: number } {
   }
 }
 
-function getPinColor(difficulty: string, climbed: boolean) {
-  if (climbed) return { bg: '#22c55e', border: '#15803d', text: 'white' }
-  if (difficulty === '\uc0c1') return { bg: '#ef4444', border: '#b91c1c', text: 'white' }
-  if (difficulty === '\uc911') return { bg: '#f97316', border: '#c2410c', text: 'white' }
-  return { bg: '#eab308', border: '#a16207', text: 'white' }
+function getMountainColor(difficulty: string, climbed: boolean) {
+  if (climbed) return { fill: '#22c55e', stroke: '#15803d', snow: '#d1fae5' }
+  if (difficulty === '\uc0c1') return { fill: '#ef4444', stroke: '#b91c1c', snow: '#fecaca' }
+  if (difficulty === '\uc911') return { fill: '#f97316', stroke: '#c2410c', snow: '#fed7aa' }
+  return { fill: '#eab308', stroke: '#a16207', snow: '#fef08a' }
 }
 
 interface Props {
@@ -52,14 +52,11 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
 
   const clamp = useCallback((val: number, min: number, max: number) => Math.min(Math.max(val, min), max), [])
 
-  // Wheel zoom
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
-    const newScale = clamp(scale + (e.deltaY > 0 ? -0.15 : 0.15), 0.8, 4)
-    setScale(newScale)
-  }, [scale, clamp])
+    setScale(prev => clamp(prev + (e.deltaY > 0 ? -0.15 : 0.15), 0.8, 4))
+  }, [clamp])
 
-  // Mouse drag
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     setIsDragging(true)
     dragStart.current = { x: e.clientX, y: e.clientY, tx: translate.x, ty: translate.y }
@@ -75,7 +72,6 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
 
   const handleMouseUp = useCallback(() => setIsDragging(false), [])
 
-  // Touch pan & pinch zoom
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       setIsDragging(true)
@@ -110,7 +106,6 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
     lastTouchDist.current = null
   }, [])
 
-  // Prevent default touch behavior for smooth pan
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -155,7 +150,8 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
             const { x, y } = latLngToPercent(m.lat, m.lng)
             const climbed = climbedSet.has(String(m.id))
             const isSelected = selected?.id === m.id
-            const colors = getPinColor(m.difficulty, climbed)
+            const colors = getMountainColor(m.difficulty, climbed)
+            const size = isSelected ? 1.4 : 1
 
             return (
               <button
@@ -165,40 +161,43 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
                 style={{
                   left: `${x}%`,
                   top: `${y}%`,
-                  transform: 'translate(-50%, -100%)',
+                  transform: `translate(-50%, -100%) scale(${size})`,
                   zIndex: isSelected ? 50 : 10,
+                  transition: 'transform 0.15s ease-out',
                 }}
               >
-                {/* Pin */}
-                <svg
-                  width={isSelected ? 28 : 20}
-                  height={isSelected ? 34 : 26}
-                  viewBox="0 0 20 26"
-                  className="drop-shadow-md transition-all duration-150"
-                  style={{ filter: isSelected ? 'drop-shadow(0 0 6px rgba(0,0,0,0.3))' : undefined }}
-                >
-                  <path
-                    d="M10 0C4.5 0 0 4.5 0 10c0 7.5 10 16 10 16s10-8.5 10-16C20 4.5 15.5 0 10 0z"
-                    fill={colors.bg}
-                    stroke={colors.border}
-                    strokeWidth="1"
+                {/* Mountain triangle icon */}
+                <svg width="22" height="20" viewBox="0 0 22 20" className="drop-shadow-sm">
+                  {/* Mountain body */}
+                  <polygon
+                    points="11,1 1,19 21,19"
+                    fill={colors.fill}
+                    stroke={colors.stroke}
+                    strokeWidth="1.2"
+                    strokeLinejoin="round"
                   />
+                  {/* Snow cap */}
+                  <polygon
+                    points="11,1 7.5,8 14.5,8"
+                    fill={colors.snow}
+                    opacity="0.7"
+                    strokeLinejoin="round"
+                  />
+                  {/* Checkmark for climbed */}
                   {climbed && (
-                    <text x="10" y="12" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold"
+                    <text x="11" y="15" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold"
                       dominantBaseline="middle">&#10003;</text>
-                  )}
-                  {!climbed && (
-                    <circle cx="10" cy="10" r="3.5" fill="white" opacity="0.5" />
                   )}
                 </svg>
 
                 {/* Label */}
                 <span
-                  className="whitespace-nowrap text-center font-bold leading-tight mt-0.5"
+                  className="whitespace-nowrap text-center font-bold leading-tight"
                   style={{
-                    fontSize: isSelected ? 11 : 9,
+                    fontSize: isSelected ? 11 : 8,
                     color: '#374151',
-                    textShadow: '0 0 3px white, 0 0 3px white, 0 0 3px white',
+                    textShadow: '0 0 3px white, 0 0 3px white, 0 0 3px white, 0 0 3px white',
+                    marginTop: -2,
                   }}
                 >
                   {m.name}
