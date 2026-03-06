@@ -1,4 +1,17 @@
 @import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+.mountain-tooltip {
+  background: white !important;
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  font-family: inherit !important;
+}
+.mountain-tooltip::before {
+  display: none !important;
+}
 
 :root {
   --background: #f0fdf4;

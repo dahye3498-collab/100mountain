@@ -1,26 +1,43 @@
 'use client'
 
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useEffect } from 'react'
+import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import { MountainData } from '@/data/mountains'
 
-// Calibrated reference point + scale for the illustrated map image
-// Based on: Seoul(37.55,127.0)→(38%,26%), Busan(35.18,129.08)→(63%,61%), Mokpo(34.81,126.39)→(31%,67%)
-const REF = { lat: 37.0, lng: 127.5, x: 44, y: 34 }
-const SCALE_X = 12.0  // % per degree longitude
-const SCALE_Y = 15.0  // % per degree latitude
-
-function latLngToPercent(lat: number, lng: number): { x: number; y: number } {
-  return {
-    x: REF.x + SCALE_X * (lng - REF.lng),
-    y: REF.y - SCALE_Y * (lat - REF.lat),
-  }
+function getMountainColor(difficulty: string, climbed: boolean) {
+  if (climbed) return '#22c55e'
+  if (difficulty === '\uc0c1') return '#ef4444'
+  if (difficulty === '\uc911') return '#f97316'
+  return '#eab308'
 }
 
-function getMountainColor(difficulty: string, climbed: boolean) {
-  if (climbed) return { fill: '#22c55e', stroke: '#15803d', snow: '#d1fae5' }
-  if (difficulty === '\uc0c1') return { fill: '#ef4444', stroke: '#b91c1c', snow: '#fecaca' }
-  if (difficulty === '\uc911') return { fill: '#f97316', stroke: '#c2410c', snow: '#fed7aa' }
-  return { fill: '#eab308', stroke: '#a16207', snow: '#fef08a' }
+function createMountainIcon(difficulty: string, climbed: boolean, isSelected: boolean) {
+  const color = getMountainColor(difficulty, climbed)
+  const size = isSelected ? 32 : 22
+  const svg = `
+    <svg width="${size}" height="${size}" viewBox="0 0 22 20" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="11,1 1,19 21,19" fill="${color}" stroke="${color === '#22c55e' ? '#15803d' : '#333'}" stroke-width="1" stroke-linejoin="round"/>
+      <polygon points="11,1 7.5,8 14.5,8" fill="white" opacity="0.5" stroke-linejoin="round"/>
+      ${climbed ? '<text x="11" y="15" text-anchor="middle" fill="white" font-size="8" font-weight="bold" dominant-baseline="middle">&#10003;</text>' : ''}
+    </svg>`
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size],
+  })
+}
+
+function FlyToSelected({ selected }: { selected: MountainData | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (selected) {
+      map.flyTo([selected.lat, selected.lng], 10, { duration: 0.5 })
+    }
+  }, [selected, map])
+  return null
 }
 
 interface Props {
@@ -31,177 +48,48 @@ interface Props {
 }
 
 export default function IllustratedMap({ mountains, climbedSet, selected, onSelect }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(1)
-  const [translate, setTranslate] = useState({ x: 0, y: 0 })
-  const [isDragging, setIsDragging] = useState(false)
-  const dragStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
-  const lastTouchDist = useRef<number | null>(null)
-
-  const clamp = useCallback((val: number, min: number, max: number) => Math.min(Math.max(val, min), max), [])
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    setScale(prev => clamp(prev + (e.deltaY > 0 ? -0.15 : 0.15), 0.8, 4))
-  }, [clamp])
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setIsDragging(true)
-    dragStart.current = { x: e.clientX, y: e.clientY, tx: translate.x, ty: translate.y }
-  }, [translate])
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging) return
-    setTranslate({
-      x: dragStart.current.tx + (e.clientX - dragStart.current.x),
-      y: dragStart.current.ty + (e.clientY - dragStart.current.y),
-    })
-  }, [isDragging])
-
-  const handleMouseUp = useCallback(() => setIsDragging(false), [])
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      setIsDragging(true)
-      dragStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, tx: translate.x, ty: translate.y }
-    }
-    if (e.touches.length === 2) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX
-      const dy = e.touches[0].clientY - e.touches[1].clientY
-      lastTouchDist.current = Math.hypot(dx, dy)
-    }
-  }, [translate])
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1 && isDragging) {
-      setTranslate({
-        x: dragStart.current.tx + (e.touches[0].clientX - dragStart.current.x),
-        y: dragStart.current.ty + (e.touches[0].clientY - dragStart.current.y),
-      })
-    }
-    if (e.touches.length === 2 && lastTouchDist.current !== null) {
-      const dx = e.touches[0].clientX - e.touches[1].clientX
-      const dy = e.touches[0].clientY - e.touches[1].clientY
-      const dist = Math.hypot(dx, dy)
-      const delta = dist - lastTouchDist.current
-      setScale(prev => clamp(prev + delta * 0.005, 0.8, 4))
-      lastTouchDist.current = dist
-    }
-  }, [isDragging, clamp])
-
-  const handleTouchEnd = useCallback(() => {
-    setIsDragging(false)
-    lastTouchDist.current = null
-  }, [])
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    const prevent = (e: TouchEvent) => { if (e.touches.length > 1) e.preventDefault() }
-    el.addEventListener('touchmove', prevent, { passive: false })
-    return () => el.removeEventListener('touchmove', prevent)
-  }, [])
-
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full overflow-hidden relative"
-      style={{ background: '#FFF8E7', touchAction: 'none' }}
-      onWheel={handleWheel}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
+    <MapContainer
+      center={[36.0, 127.8]}
+      zoom={7}
+      minZoom={6}
+      maxZoom={15}
+      style={{ width: '100%', height: '100%' }}
+      zoomControl={false}
+      attributionControl={false}
     >
-      <div
-        style={{
-          transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
-          transformOrigin: 'center center',
-          transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-          width: '140vh',
-          height: '140vh',
-          position: 'absolute',
-          left: '50%',
-          top: '50%',
-          marginLeft: '-70vh',
-          marginTop: '-70vh',
-        }}
-      >
-        <div className="relative w-full h-full">
-          <img
-            src="/images/Gemini_Generated_Image_l79vznl79vznl79v.png"
-            alt="Korea Map"
-            className="absolute inset-0 w-full h-full pointer-events-none select-none"
-            draggable={false}
-          />
-
-          {mountains.map(m => {
-            const { x, y } = latLngToPercent(m.lat, m.lng)
-            const climbed = climbedSet.has(String(m.id))
-            const isSelected = selected?.id === m.id
-            const colors = getMountainColor(m.difficulty, climbed)
-
-            return (
-              <button
-                key={m.id}
-                onClick={(e) => { e.stopPropagation(); onSelect(m) }}
-                className="absolute flex flex-col items-center"
-                style={{
-                  left: `${x}%`,
-                  top: `${y}%`,
-                  transform: `translate(-50%, -100%) scale(${isSelected ? 1.5 : 1})`,
-                  zIndex: isSelected ? 50 : 10,
-                  transition: 'transform 0.15s ease-out',
-                }}
-              >
-                <svg width="18" height="16" viewBox="0 0 22 20" className="drop-shadow-sm">
-                  <polygon
-                    points="11,1 1,19 21,19"
-                    fill={colors.fill}
-                    stroke={colors.stroke}
-                    strokeWidth="1.2"
-                    strokeLinejoin="round"
-                  />
-                  <polygon
-                    points="11,1 7.5,8 14.5,8"
-                    fill={colors.snow}
-                    opacity="0.7"
-                    strokeLinejoin="round"
-                  />
-                  {climbed && (
-                    <text x="11" y="15" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold"
-                      dominantBaseline="middle">&#10003;</text>
-                  )}
-                </svg>
-
-                <span
-                  className="whitespace-nowrap text-center font-bold leading-none"
-                  style={{
-                    fontSize: isSelected ? 10 : 7,
-                    color: '#374151',
-                    textShadow: '0 0 2px white, 0 0 2px white, 0 0 2px white, 0 0 2px white',
-                    marginTop: -1,
-                  }}
-                >
-                  {m.name}
+      <TileLayer
+        url="https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png"
+      />
+      <FlyToSelected selected={selected} />
+      {mountains.map(m => {
+        const climbed = climbedSet.has(String(m.id))
+        const isSelected = selected?.id === m.id
+        return (
+          <Marker
+            key={m.id}
+            position={[m.lat, m.lng]}
+            icon={createMountainIcon(m.difficulty, climbed, isSelected)}
+            eventHandlers={{ click: () => onSelect(m) }}
+          >
+            <Tooltip
+              direction="bottom"
+              offset={[0, 2]}
+              permanent={isSelected}
+              className="mountain-tooltip"
+            >
+              <span style={{ fontWeight: 700, fontSize: isSelected ? 13 : 11 }}>
+                {m.name}
+              </span>
+              {isSelected && (
+                <span style={{ fontSize: 10, color: '#6b7280', marginLeft: 4 }}>
+                  {m.height.toLocaleString()}m
                 </span>
-
-                {isSelected && (
-                  <span
-                    className="whitespace-nowrap text-center leading-none"
-                    style={{ fontSize: 7, color: '#6b7280', textShadow: '0 0 2px white, 0 0 2px white' }}
-                  >
-                    {m.height.toLocaleString()}m
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
-    </div>
+              )}
+            </Tooltip>
+          </Marker>
+        )
+      })}
+    </MapContainer>
   )
 }
