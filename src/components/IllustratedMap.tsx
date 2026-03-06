@@ -3,28 +3,28 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { MountainData } from '@/data/mountains'
 
-// Korea coordinate bounds (South Korea mainland + Jeju)
+// Korea coordinate bounds
 const MAP_BOUNDS = {
   latMin: 33.0,
   latMax: 38.8,
-  lngMin: 125.0,
-  lngMax: 129.6,
+  lngMin: 124.5,
+  lngMax: 130.0,
 }
 
-// Where Korea sits within the image (percentage-based)
-const IMAGE_OFFSET = {
-  xPct: 18,
-  yPct: 6,
-  wPct: 52,
-  hPct: 78,
+// Where Korea actually sits within the square image (%)
+const IMG = {
+  xStart: 17,
+  yStart: 4,
+  xEnd: 73,
+  yEnd: 82,
 }
 
 function latLngToPercent(lat: number, lng: number): { x: number; y: number } {
   const xRatio = (lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin)
   const yRatio = 1 - (lat - MAP_BOUNDS.latMin) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)
   return {
-    x: IMAGE_OFFSET.xPct + xRatio * IMAGE_OFFSET.wPct,
-    y: IMAGE_OFFSET.yPct + yRatio * IMAGE_OFFSET.hPct,
+    x: IMG.xStart + xRatio * (IMG.xEnd - IMG.xStart),
+    y: IMG.yStart + yRatio * (IMG.yEnd - IMG.yStart),
   }
 }
 
@@ -129,46 +129,50 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
       onTouchEnd={handleTouchEnd}
     >
       <div
-        className="w-full h-full relative"
         style={{
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
           transformOrigin: 'center center',
           transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+          /* Image is square — size it to viewport height so it's big enough */
+          width: '100vh',
+          height: '100vh',
+          position: 'absolute',
+          left: '50%',
+          top: '0',
+          marginLeft: '-50vh',
         }}
       >
-        {/* Map background image */}
-        <img
-          src="/images/Gemini_Generated_Image_jwdisbjwdisbjwdi.png"
-          alt="Korea Map"
-          className="w-full h-full object-contain pointer-events-none select-none"
-          draggable={false}
-        />
+        {/* The image and pins share the same coordinate space */}
+        <div className="relative w-full h-full">
+          <img
+            src="/images/Gemini_Generated_Image_jwdisbjwdisbjwdi.png"
+            alt="Korea Map"
+            className="absolute inset-0 w-full h-full pointer-events-none select-none"
+            draggable={false}
+          />
 
-        {/* Mountain markers overlay */}
-        <div className="absolute inset-0">
+          {/* Mountain markers */}
           {mountains.map(m => {
             const { x, y } = latLngToPercent(m.lat, m.lng)
             const climbed = climbedSet.has(String(m.id))
             const isSelected = selected?.id === m.id
             const colors = getMountainColor(m.difficulty, climbed)
-            const size = isSelected ? 1.4 : 1
 
             return (
               <button
                 key={m.id}
                 onClick={(e) => { e.stopPropagation(); onSelect(m) }}
-                className="absolute flex flex-col items-center group"
+                className="absolute flex flex-col items-center"
                 style={{
                   left: `${x}%`,
                   top: `${y}%`,
-                  transform: `translate(-50%, -100%) scale(${size})`,
+                  transform: `translate(-50%, -100%) scale(${isSelected ? 1.5 : 1})`,
                   zIndex: isSelected ? 50 : 10,
                   transition: 'transform 0.15s ease-out',
                 }}
               >
-                {/* Mountain triangle icon */}
-                <svg width="22" height="20" viewBox="0 0 22 20" className="drop-shadow-sm">
-                  {/* Mountain body */}
+                {/* Mountain triangle */}
+                <svg width="18" height="16" viewBox="0 0 22 20" className="drop-shadow-sm">
                   <polygon
                     points="11,1 1,19 21,19"
                     fill={colors.fill}
@@ -176,28 +180,26 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
                     strokeWidth="1.2"
                     strokeLinejoin="round"
                   />
-                  {/* Snow cap */}
                   <polygon
                     points="11,1 7.5,8 14.5,8"
                     fill={colors.snow}
                     opacity="0.7"
                     strokeLinejoin="round"
                   />
-                  {/* Checkmark for climbed */}
                   {climbed && (
                     <text x="11" y="15" textAnchor="middle" fill="white" fontSize="8" fontWeight="bold"
                       dominantBaseline="middle">&#10003;</text>
                   )}
                 </svg>
 
-                {/* Label */}
+                {/* Name label */}
                 <span
-                  className="whitespace-nowrap text-center font-bold leading-tight"
+                  className="whitespace-nowrap text-center font-bold leading-none"
                   style={{
-                    fontSize: isSelected ? 11 : 8,
+                    fontSize: isSelected ? 10 : 7,
                     color: '#374151',
-                    textShadow: '0 0 3px white, 0 0 3px white, 0 0 3px white, 0 0 3px white',
-                    marginTop: -2,
+                    textShadow: '0 0 2px white, 0 0 2px white, 0 0 2px white, 0 0 2px white',
+                    marginTop: -1,
                   }}
                 >
                   {m.name}
@@ -205,12 +207,8 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
 
                 {isSelected && (
                   <span
-                    className="whitespace-nowrap text-center leading-tight"
-                    style={{
-                      fontSize: 8,
-                      color: '#6b7280',
-                      textShadow: '0 0 3px white, 0 0 3px white',
-                    }}
+                    className="whitespace-nowrap text-center leading-none"
+                    style={{ fontSize: 7, color: '#6b7280', textShadow: '0 0 2px white, 0 0 2px white' }}
                   >
                     {m.height.toLocaleString()}m
                   </span>
