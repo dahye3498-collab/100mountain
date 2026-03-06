@@ -3,28 +3,17 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { MountainData } from '@/data/mountains'
 
-// Korea coordinate bounds
-const MAP_BOUNDS = {
-  latMin: 33.0,
-  latMax: 38.8,
-  lngMin: 124.5,
-  lngMax: 130.0,
-}
-
-// Where Korea actually sits within the square image (%)
-const IMG = {
-  xStart: 17,
-  yStart: 4,
-  xEnd: 73,
-  yEnd: 82,
-}
+// Calibrated from reference points on the illustrated map image:
+// Seoul (37.5, 127.0) -> (38%, 28%)
+// Busan (35.3, 129.0) -> (65%, 60%)
+const REF = { lat: 37.5, lng: 127.0, x: 38, y: 28 }
+const SCALE_X = 13.5  // % per degree longitude
+const SCALE_Y = 14.55 // % per degree latitude (inverted: north=up)
 
 function latLngToPercent(lat: number, lng: number): { x: number; y: number } {
-  const xRatio = (lng - MAP_BOUNDS.lngMin) / (MAP_BOUNDS.lngMax - MAP_BOUNDS.lngMin)
-  const yRatio = 1 - (lat - MAP_BOUNDS.latMin) / (MAP_BOUNDS.latMax - MAP_BOUNDS.latMin)
   return {
-    x: IMG.xStart + xRatio * (IMG.xEnd - IMG.xStart),
-    y: IMG.yStart + yRatio * (IMG.yEnd - IMG.yStart),
+    x: REF.x + SCALE_X * (lng - REF.lng),
+    y: REF.y - SCALE_Y * (lat - REF.lat),
   }
 }
 
@@ -133,17 +122,18 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
           transformOrigin: 'center center',
           transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-          /* Image is square — size it to viewport height so it's big enough */
-          width: '100vh',
-          height: '100vh',
+          /* Square image sized to 120% of viewport height for bigger display */
+          width: '120vh',
+          height: '120vh',
           position: 'absolute',
           left: '50%',
-          top: '0',
-          marginLeft: '-50vh',
+          top: '50%',
+          marginLeft: '-60vh',
+          marginTop: '-60vh',
         }}
       >
-        {/* The image and pins share the same coordinate space */}
         <div className="relative w-full h-full">
+          {/* Map background - fills the square exactly */}
           <img
             src="/images/Gemini_Generated_Image_jwdisbjwdisbjwdi.png"
             alt="Korea Map"
@@ -151,7 +141,7 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
             draggable={false}
           />
 
-          {/* Mountain markers */}
+          {/* Mountain markers - positioned as % of the image */}
           {mountains.map(m => {
             const { x, y } = latLngToPercent(m.lat, m.lng)
             const climbed = climbedSet.has(String(m.id))
@@ -192,7 +182,7 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
                   )}
                 </svg>
 
-                {/* Name label */}
+                {/* Name */}
                 <span
                   className="whitespace-nowrap text-center font-bold leading-none"
                   style={{
