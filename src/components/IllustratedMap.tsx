@@ -3,12 +3,11 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import { MountainData } from '@/data/mountains'
 
-// Calibrated from reference points on the illustrated map image:
-// Seoul (37.5, 127.0) -> (38%, 28%)
-// Busan (35.3, 129.0) -> (65%, 60%)
-const REF = { lat: 37.5, lng: 127.0, x: 38, y: 28 }
-const SCALE_X = 13.5  // % per degree longitude
-const SCALE_Y = 14.55 // % per degree latitude (inverted: north=up)
+// Calibrated reference point + scale for the illustrated map image
+// Based on: Seoul(37.55,127.0)→(38%,26%), Busan(35.18,129.08)→(63%,61%), Mokpo(34.81,126.39)→(31%,67%)
+const REF = { lat: 37.0, lng: 127.5, x: 44, y: 34 }
+const SCALE_X = 12.0  // % per degree longitude
+const SCALE_Y = 15.0  // % per degree latitude
 
 function latLngToPercent(lat: number, lng: number): { x: number; y: number } {
   return {
@@ -122,26 +121,23 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
           transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`,
           transformOrigin: 'center center',
           transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-          /* Square image sized to 120% of viewport height for bigger display */
-          width: '120vh',
-          height: '120vh',
+          width: '140vh',
+          height: '140vh',
           position: 'absolute',
           left: '50%',
           top: '50%',
-          marginLeft: '-60vh',
-          marginTop: '-60vh',
+          marginLeft: '-70vh',
+          marginTop: '-70vh',
         }}
       >
         <div className="relative w-full h-full">
-          {/* Map background - fills the square exactly */}
           <img
-            src="/images/Gemini_Generated_Image_jwdisbjwdisbjwdi.png"
+            src="/images/Gemini_Generated_Image_l79vznl79vznl79v.png"
             alt="Korea Map"
             className="absolute inset-0 w-full h-full pointer-events-none select-none"
             draggable={false}
           />
 
-          {/* Mountain markers - positioned as % of the image */}
           {mountains.map(m => {
             const { x, y } = latLngToPercent(m.lat, m.lng)
             const climbed = climbedSet.has(String(m.id))
@@ -161,7 +157,6 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
                   transition: 'transform 0.15s ease-out',
                 }}
               >
-                {/* Mountain triangle */}
                 <svg width="18" height="16" viewBox="0 0 22 20" className="drop-shadow-sm">
                   <polygon
                     points="11,1 1,19 21,19"
@@ -182,7 +177,6 @@ export default function IllustratedMap({ mountains, climbedSet, selected, onSele
                   )}
                 </svg>
 
-                {/* Name */}
                 <span
                   className="whitespace-nowrap text-center font-bold leading-none"
                   style={{
